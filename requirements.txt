@@ -1,0 +1,9 @@
+Flask>=3.0,<4.0
+Flask-WTF>=1.2
+Werkzeug>=3.0
+pymongo>=4.6
+requests>=2.31
+python-dotenv>=1.0
+feedparser>=6.0
+bleach>=6.0
+pytest>=8.0

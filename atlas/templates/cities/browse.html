@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Browse cities{% endblock %}
+{% block content %}
+<h1>Browse cities</h1>
+<p class="subtitle">Search any city in the world (cities with population over 15,000).</p>
+
+<form method="get" class="search-bar">
+  <input name="q" value="{{ q }}" placeholder="e.g. Tokyo, Reykjavik, Cusco..." autofocus>
+  <button type="submit">Search</button>
+</form>
+
+{% if q and not results %}
+  <p>No cities matched "<strong>{{ q }}</strong>".</p>
+{% endif %}
+
+{% if results %}
+<h2>{{ results | length }} result{{ '' if results | length == 1 else 's' }} for "{{ q }}"</h2>
+<table class="cities-table">
+  <thead>
+    <tr><th>City</th><th>Country</th><th>Population</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for c in results %}
+    <tr>
+      <td>
+        <strong>{{ c.name }}</strong>
+        {% if c.admin1 %}<small class="muted">· {{ c.admin1 }}</small>{% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('countries.detail', cca3=c.country_cca3) }}">
+          {{ country_names.get(c.country_cca3, c.country_cca3) }}
+        </a>
+        <small class="muted">({{ c.country_cca3 }})</small>
+      </td>
+      <td>{{ '{:,}'.format(c.population) if c.population else '—' }}</td>
+      <td class="actions">
+        <form method="post" action="{{ url_for('wishlist.add') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="city_id" value="{{ c.id }}">
+          <input type="hidden" name="priority" value="1">
+          <button type="submit" class="btn-small">+ Wishlist</button>
+        </form>
+        <a class="btn-small btn-secondary-inline"
+           href="{{ url_for('countries.detail', cca3=c.country_cca3) }}">View country</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

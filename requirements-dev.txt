@@ -1,0 +1,3 @@
+-r requirements.txt
+mongomock>=4.3,<5
+pytest-socket>=0.7,<1

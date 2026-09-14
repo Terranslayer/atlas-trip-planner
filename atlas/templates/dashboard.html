@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+
+<h1>Dashboard <small style="color:#64748b">— {{ g.user.username }}</small></h1>
+<div class="stats">
+  <div><strong>{{ wl_count }}</strong><span>Wishlist cities</span></div>
+  <div><strong>{{ v_count }}</strong><span>Visited cities</span></div>
+  <div><strong>{{ t_count }}</strong><span>Trips</span></div>
+  <div><strong>{{ countries_visited }}</strong><span>Countries visited</span></div>
+</div>
+
+{% if wl_count == 0 and v_count == 0 and t_count == 0 %}
+<div class="empty-cta">
+  <h3>Welcome — let's plan your first trip.</h3>
+  <p>Start by searching for cities you want to visit, then group them into a trip with dates.</p>
+  <a class="btn-primary" href="{{ url_for('cities.browse') }}">Browse cities</a>
+  <a class="btn-secondary" href="{{ url_for('trips.index') }}">Create a trip</a>
+</div>
+{% endif %}
+
+<div id="map" style="height:440px;border:1px solid #e2e8f0;border-radius:8px;margin:1rem 0"></div>
+
+<h2>Upcoming Trips</h2>
+<ul>
+{% for t in upcoming %}
+  <li><a href="{{ url_for('trips.brief', trip_id=t.id) }}">{{ t.name }}</a> — {{ t.start_date }}</li>
+{% else %}
+  <li>No upcoming trips with set start dates. <a href="{{ url_for('trips.index') }}">Create one</a>.</li>
+{% endfor %}
+</ul>
+
+<h2>Currency Cheat Sheet</h2>
+<ul id="currency-list"><li>Loading…</li></ul>
+
+<h2>Languages on Your List</h2>
+<p id="language-list">Loading…</p>
+
+<script>
+(async function () {
+  const r = await fetch('/api/map-data');
+  if (!r.ok) return;
+  const j = await r.json();
+
+  const map = L.map('map', { worldCopyJump: true, minZoom: 2, attributionControl: false }).setView([25, 10], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 8 }).addTo(map);
+
+  function safeLabel(parts) {
+    // Build label as DOM nodes to avoid innerHTML on untrusted strings
+    const div = document.createElement('div');
+    parts.forEach((p, i) => {
+      if (i > 0) div.appendChild(document.createElement('br'));
+      const span = document.createElement('span');
+      span.textContent = p == null ? '' : String(p);
+      div.appendChild(span);
+    });
+    return div;
+  }
+
+  function pin(lat, lon, color, label) {
+    const m = L.circleMarker([lat, lon], {
+      radius: 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1
+    }).addTo(map);
+    if (label) m.bindTooltip(label, { direction: 'top', offset: [0, -6] });
+    return m;
+  }
+
+  j.visited.forEach(v => pin(v.lat, v.lon, '#22c55e',
+    safeLabel([v.name + ' (visited)', v.date || ''])));
+  j.wishlist.forEach(w => pin(w.lat, w.lon, '#3b82f6',
+    safeLabel([w.name + ' (wishlist)', w.note || ''])));
+  j.trips.forEach(t => {
+    t.cities.forEach(c => pin(c.lat, c.lon, t.color, safeLabel([c.name, 'Trip: ' + t.name])));
+    if (t.coords.length >= 2) {
+      const line = L.polyline(t.coords, { color: t.color, weight: 3, opacity: 0.85 }).addTo(map);
+      L.polylineDecorator(line, {
+        patterns: [{
+          offset: '15%', repeat: '35%',
+          symbol: L.Symbol.arrowHead({
+            pixelSize: 12, polygon: true,
+            pathOptions: { color: t.color, fillOpacity: 0.9, weight: 0 }
+          })
+        }]
+      }).addTo(map);
+    }
+  });
+
+  // Currency list (safe DOM)
+  const cu = document.getElementById('currency-list');
+  while (cu.firstChild) cu.removeChild(cu.firstChild);
+  if (j.currencies.length === 0) {
+    const li = document.createElement('li'); li.textContent = '—'; cu.appendChild(li);
+  } else {
+    j.currencies.forEach(c => {
+      const li = document.createElement('li');
+      li.textContent = c.code + ' (' + (c.name || '') + ') — 1 USD ≈ ' + Number(c.rate).toFixed(4);
+      cu.appendChild(li);
+    });
+  }
+
+  // Language list (safe text)
+  document.getElementById('language-list').textContent =
+    j.languages.length ? j.languages.join(', ') : '—';
+})();
+</script>
+<style>
+.stats { display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin:1rem 0; }
+.stats > div { background:#f8fafc;padding:1rem;border-radius:8px;text-align:center;border:1px solid #e2e8f0; }
+.stats strong { font-size:1.6rem;display:block;color:#0f172a; }
+.stats span { font-size:0.85rem;color:#64748b; }
+.pill { display:inline-block;padding:0.1rem 0.55rem;border-radius:999px;font-size:0.75rem;font-weight:600; }
+.pill-ideal { background:#dcfce7;color:#15803d; }
+.pill-good  { background:#dcfce7;color:#15803d; }
+.pill-fair  { background:#fef9c3;color:#a16207; }
+.pill-poor  { background:#fee2e2;color:#b91c1c; }
+.grip { cursor:grab;color:#94a3b8;margin-right:0.5rem; }
+.cache-banner { background:#fef9c3;color:#854d0e;padding:0.6rem 1rem;border-radius:6px;margin-bottom:0.75rem;font-size:0.9rem; }
+</style>
+{% endblock %}

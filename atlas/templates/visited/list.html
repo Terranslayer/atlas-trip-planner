@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Visited{% endblock %}
+{% block content %}
+<h1>Visited ({{ items | length }})</h1>
+{% if not items %}<p>No visits logged yet.</p>{% endif %}
+{% for v in items %}
+  <div class="v-card" data-visited-id="{{ v.id }}">
+    <h3>{{ v.city_name }} <small>({{ v.country_cca3 }})</small></h3>
+    <form method="post" action="{{ url_for('visited.edit', item_id=v.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Date <input type="date" name="visited_date" value="{{ v.visited_date }}" required></label>
+      <label>Journal <input name="journal" value="{{ v.journal or '' }}" maxlength="500"></label>
+      <button type="submit">Save</button>
+    </form>
+    <form method="post" action="{{ url_for('visited.delete', item_id=v.id) }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="danger">Delete</button>
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

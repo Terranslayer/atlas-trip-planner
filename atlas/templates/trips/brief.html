@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ trip.name }}{% endblock %}
+{% block content %}
+<div class="trip-header">
+  <h1>{{ trip.name }}</h1>
+  <p>{{ trip.start_date or '?' }} – {{ trip.end_date or '?' }}</p>
+  <a class="btn" href="{{ url_for('trips.export_md', trip_id=trip.id) }}">Export Brief (.md)</a>
+</div>
+
+<h2>Itinerary</h2>
+<ul id="stops" data-trip-id="{{ trip.id }}">
+  {% for s in stops %}
+    <li data-stop-id="{{ s.id }}" draggable="true">
+      <span class="grip">⋮⋮</span>
+      <strong>{{ s.city_name }}</strong> ({{ s.country_cca3 }})
+      &middot; {{ s.arrival_date or '?' }} → {{ s.departure_date or '?' }}
+      {% if s.climate_verdict %}
+        <span class="pill pill-{{ s.climate_verdict | lower }}">{{ s.climate_verdict }} ({{ s.climate_score }})</span>
+      {% endif %}
+      <form method="post" action="{{ url_for('trips.delete_stop', trip_id=trip.id, stop_id=s.id) }}" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="danger">×</button>
+      </form>
+    </li>
+  {% else %}
+    <li>No stops yet.</li>
+  {% endfor %}
+</ul>
+
+<h3>Add a stop</h3>
+<form id="add-stop" method="post" action="{{ url_for('trips.add_stop', trip_id=trip.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input id="city-search-q" placeholder="Search a city…" autocomplete="off">
+  <div id="city-search-results"></div>
+  <input type="hidden" name="city_id" id="picked_city_id">
+  <input type="date" name="arrival_date">
+  <input type="date" name="departure_date">
+  <button type="submit">Add</button>
+</form>
+
+<h2>Currencies</h2>
+<ul>
+  {% for code, c in currencies.items() %}
+    <li><strong>{{ code }}</strong> {{ c.name }} — 1 USD ≈ {{ '%.4f' % c.rate }} {{ code }} ({{ c.as_of }})</li>
+  {% else %}<li>—</li>{% endfor %}
+</ul>
+
+<h2>Languages</h2>
+<p>{{ languages | join(', ') or '—' }}</p>
+
+<h2>Travel Advisories</h2>
+<ul>
+  {% for cca3, adv in advisories.items() %}
+    <li>{{ countries[cca3].name.common or cca3 }}:
+      {% set advisory = adv %}{% include "_partials/advisory_badge.html" %}
+    </li>
+  {% endfor %}
+</ul>
+
+<h2>Country Basics</h2>
+{% for cca3, c in countries.items() %}
+  <h3>{{ c.name.common or cca3 }}</h3>
+  <dl class="basics">
+    <dt>Timezone</dt><dd>{{ c.timezones | join(', ') if c.timezones else '—' }}</dd>
+    <dt>Drive side</dt><dd>{{ c.car.side | capitalize if c.car and c.car.side else '—' }}</dd>
+    <dt>Calling code</dt><dd>{{ c.idd.root if c.idd else '' }}{{ c.idd.suffixes[0] if c.idd and c.idd.suffixes else '' }}</dd>
+  </dl>
+{% endfor %}
+
+<script>
+// City picker (safe DOM)
+(function () {
+  const q = document.getElementById('city-search-q');
+  const out = document.getElementById('city-search-results');
+  const picked = document.getElementById('picked_city_id');
+  q.addEventListener('input', async () => {
+    while (out.firstChild) out.removeChild(out.firstChild);
+    const v = q.value.trim();
+    if (!v) return;
+    const r = await fetch('/cities/search?q=' + encodeURIComponent(v));
+    if (!r.ok) return;
+    const j = await r.json();
+    j.results.forEach(c => {
+      const row = document.createElement('div');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = c.name + (c.admin1 ? ' · ' + c.admin1 : '') + ' (' + c.country_cca3 + ')';
+      btn.addEventListener('click', () => {
+        picked.value = String(c.id);
+        q.value = c.name;
+        while (out.firstChild) out.removeChild(out.firstChild);
+      });
+      row.appendChild(btn);
+      out.appendChild(row);
+    });
+  });
+})();
+
+// Drag-and-drop reorder
+(function () {
+  const ul = document.getElementById('stops');
+  if (!ul) return;
+  const csrf = {{ csrf_token() | tojson }};
+  let dragEl = null;
+  ul.querySelectorAll('li[data-stop-id]').forEach(li => {
+    li.addEventListener('dragstart', () => { dragEl = li; });
+    li.addEventListener('dragover', e => e.preventDefault());
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragEl || dragEl === li) return;
+      ul.insertBefore(dragEl, li);
+      dragEl = null;
+      persistOrder();
+    });
+  });
+  async function persistOrder() {
+    const order = Array.from(ul.querySelectorAll('li[data-stop-id]')).map(li => parseInt(li.dataset.stopId, 10));
+    await fetch('/trips/' + ul.dataset.tripId + '/stops/reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+      body: JSON.stringify({order})
+    });
+  }
+})();
+</script>
+{% endblock %}

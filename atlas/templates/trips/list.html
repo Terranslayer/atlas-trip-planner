@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Trips{% endblock %}
+{% block content %}
+<h1>Trips</h1>
+<form method="post" action="{{ url_for('trips.new') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input name="name" placeholder="Trip name" maxlength="60" required>
+  <input type="date" name="start_date">
+  <input type="date" name="end_date">
+  <button type="submit">Create</button>
+</form>
+<ul>
+{% for t in trips %}
+  <li><a href="{{ url_for('trips.brief', trip_id=t.id) }}">{{ t.name }}</a>
+    {% if t.start_date %} — {{ t.start_date }} → {{ t.end_date or '?' }}{% endif %}</li>
+{% else %}
+  <li>No trips yet.</li>
+{% endfor %}
+</ul>
+{% endblock %}

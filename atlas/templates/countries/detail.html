@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ country.name.common }}{% endblock %}
+{% block content %}
+{% if cache_warning %}<div class="cache-banner">{{ cache_warning }}</div>{% endif %}
+
+<h1>{{ country.name.common }}
+  {% if country.flags.png %}<img src="{{ country.flags.png }}" alt="{{ country.flags.alt or country.name.common }}" style="height:1em;vertical-align:middle">{% endif %}
+</h1>
+<p>{{ country.region }} &middot; {{ country.subregion }}</p>
+
+<h2>Travel Advisory</h2>
+{% include "_partials/advisory_badge.html" %}
+
+<h2>Country Basics</h2>
+<dl class="basics">
+  <dt>Capital</dt><dd>{{ country.capital | join(', ') if country.capital else '—' }}</dd>
+  <dt>Languages</dt><dd>{{ country.languages.values() | join(', ') if country.languages else '—' }}</dd>
+  <dt>Timezone</dt><dd>{{ country.timezones | join(', ') if country.timezones else '—' }}</dd>
+  <dt>Drive side</dt><dd>{{ country.car.side | capitalize if country.car and country.car.side else '—' }}</dd>
+  <dt>Calling code</dt><dd>{{ country.idd.root if country.idd else '' }}{{ country.idd.suffixes[0] if country.idd and country.idd.suffixes else '' }}</dd>
+  <dt>Population</dt><dd>{{ '{:,}'.format(country.population) if country.population else '—' }}</dd>
+</dl>
+
+<h2>Currency</h2>
+{% for code, info in country.currencies.items() %}
+  <p><strong>{{ code }}</strong> — {{ info.name }} ({{ info.symbol }})
+    {% if rates.get(code) %}<br>1 USD &asymp; {{ '%.4f' % rates[code].rate }} {{ code }}
+      <small>(as of {{ rates[code].as_of }}{% if rates[code].stale %} &middot; cached{% endif %})</small>
+    {% endif %}
+  </p>
+{% else %}
+  <p>—</p>
+{% endfor %}
+
+{% if travel_notes and travel_notes.sections %}
+<h2>Travel Notes <small style="font-weight:400;color:#64748b">— from <a href="{{ travel_notes.source_url }}" target="_blank" rel="noopener">Wikivoyage</a></small></h2>
+{% for title, html in travel_notes.sections.items() %}
+  <details class="wv-note">
+    <summary>{{ title }}</summary>
+    <div class="wv-body">{{ html | safe }}</div>
+  </details>
+{% endfor %}
+{% endif %}
+
+<h2>Cities in this country</h2>
+<form id="city-search" onsubmit="event.preventDefault()">
+  <input name="q" placeholder="Type to search cities…" autocomplete="off">
+</form>
+<div id="city-results"></div>
+
+<script>
+// Safe DOM construction. Never use innerHTML with untrusted strings.
+(function () {
+  const input = document.querySelector('#city-search input[name=q]');
+  const out   = document.getElementById('city-results');
+  const cca3  = {{ country._id | tojson }};
+  const csrf  = {{ csrf_token() | tojson }};
+
+  function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+  function makeHidden(name, value) {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = name; i.value = value;
+    return i;
+  }
+
+  function renderResult(c) {
+    const row = document.createElement('div');
+    row.className = 'city-row';
+
+    const label = document.createElement('strong');
+    label.textContent = c.name + (c.admin1 ? ' · ' + c.admin1 : '');
+    row.appendChild(label);
+
+    const wf = document.createElement('form');
+    wf.method = 'post'; wf.action = '/wishlist/add'; wf.style.display = 'inline';
+    wf.appendChild(makeHidden('csrf_token', csrf));
+    wf.appendChild(makeHidden('city_id', String(c.id)));
+    wf.appendChild(makeHidden('priority', '1'));
+    const wn = document.createElement('input');
+    wn.type = 'text'; wn.name = 'note'; wn.placeholder = 'note'; wn.maxLength = 500;
+    wf.appendChild(wn);
+    const wb = document.createElement('button');
+    wb.type = 'submit'; wb.textContent = 'Add to wishlist';
+    wf.appendChild(wb);
+    row.appendChild(wf);
+
+    const vf = document.createElement('form');
+    vf.method = 'post'; vf.action = '/visited/add'; vf.style.display = 'inline';
+    vf.appendChild(makeHidden('csrf_token', csrf));
+    vf.appendChild(makeHidden('city_id', String(c.id)));
+    const vd = document.createElement('input');
+    vd.type = 'date'; vd.name = 'visited_date'; vd.required = true;
+    vf.appendChild(vd);
+    const vb = document.createElement('button');
+    vb.type = 'submit'; vb.textContent = 'Log visit';
+    vf.appendChild(vb);
+    row.appendChild(vf);
+
+    return row;
+  }
+
+  input.addEventListener('input', async () => {
+    const v = input.value.trim();
+    clearChildren(out);
+    if (!v) return;
+    const resp = await fetch('/cities/search?q=' + encodeURIComponent(v));
+    if (!resp.ok) return;
+    const j = await resp.json();
+    j.results.filter(c => c.country_cca3 === cca3).forEach(c => out.appendChild(renderResult(c)));
+  });
+})();
+</script>
+{% endblock %}

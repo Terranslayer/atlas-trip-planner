@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Wishlist{% endblock %}
+{% block content %}
+<h1>Wishlist ({{ items | length }})</h1>
+{% if not items %}
+  <p>No cities on your wishlist yet. <a href="{{ url_for('cities.browse') }}">Browse cities</a> to add some.</p>
+{% endif %}
+
+{% for it in items %}
+  <div class="wl-card" data-wishlist-id="{{ it.id }}">
+    <h3>
+      {{ it.city_name }}
+      <small><a href="{{ url_for('countries.detail', cca3=it.country_cca3) }}">{{ it.country_cca3 }}</a></small>
+      {% if it.priority == 2 %}<span class="prio prio-high">High</span>
+      {% elif it.priority == 0 %}<span class="prio prio-low">Low</span>
+      {% else %}<span class="prio prio-med">Medium</span>{% endif %}
+    </h3>
+
+    <form method="post" action="{{ url_for('wishlist.edit', item_id=it.id) }}" class="wl-edit">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input name="note" value="{{ it.note or '' }}" placeholder="note (e.g. spring 2027)" maxlength="500">
+      <select name="priority">
+        <option value="0" {% if it.priority==0 %}selected{% endif %}>Low</option>
+        <option value="1" {% if it.priority==1 %}selected{% endif %}>Medium</option>
+        <option value="2" {% if it.priority==2 %}selected{% endif %}>High</option>
+      </select>
+      <button type="submit">Save</button>
+    </form>
+
+    <form method="post" action="{{ url_for('wishlist.visit', item_id=it.id) }}" class="wl-visit">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        Visited on
+        <input type="date" name="visited_date" required>
+      </label>
+      <input name="journal" placeholder="optional trip note" maxlength="500">
+      <button type="submit" class="btn-visit">Mark visited</button>
+    </form>
+
+    <form method="post" action="{{ url_for('wishlist.delete', item_id=it.id) }}" class="wl-delete">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="danger">Remove from wishlist</button>
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

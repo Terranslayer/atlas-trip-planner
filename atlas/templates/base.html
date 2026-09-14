@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Atlas{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topnav">
+    <a class="brand" href="{{ url_for('dashboard.index') }}">Atlas</a>
+    {% if session.user_id %}
+      <nav>
+        <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+        <a href="{{ url_for('cities.browse') }}">Browse</a>
+        <a href="{{ url_for('wishlist.index') }}">Wishlist</a>
+        <a href="{{ url_for('visited.index') }}">Visited</a>
+        <a href="{{ url_for('trips.index') }}">Trips</a>
+      </nav>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="signout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">Sign out</button>
+      </form>
+    {% endif %}
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash flash-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

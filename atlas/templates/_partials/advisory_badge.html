@@ -1,0 +1,13 @@
+{% if advisory %}
+  {% set level = advisory.level or 0 %}
+  {% set cls = {1:'green',2:'yellow',3:'orange',4:'red'}.get(level, 'gray') %}
+  <span class="advisory advisory-{{ cls }}">
+    Level {{ level }} &middot; {{ advisory.level_text or 'See full advisory' }}
+  </span>
+  <span class="advisory-source">
+    U.S. State Dept &middot; {{ advisory.published }} &middot;
+    <a href="{{ advisory.url }}" target="_blank" rel="noopener">full text</a>
+  </span>
+{% else %}
+  <span class="advisory advisory-gray">No advisory on file</span>
+{% endif %}
